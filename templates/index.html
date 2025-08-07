@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Welcome to My Flask App</h1>
+    <form id="dataForm">
+        <label for="dataInput">Enter some data:</label>
+        <input type="text" id="dataInput" name="data">
+        <button type="submit">Submit</button>
+    </form>
+    <div id="response"></div>
+    <script>
+        document.getElementById('dataForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = { data: document.getElementById('dataInput').value };
+            const response = await fetch('/api/data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            document.getElementById('response').innerText = result.message;
+        });
+    </script>
+</body>
+</html>
