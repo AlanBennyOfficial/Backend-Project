@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="card p-3 text-center">
+  <h4>Student Scanner</h4>
+  <input id="studentId" class="form-control mb-2" placeholder="Enter your student id / name">
+  <div id="reader" style="width: 320px; margin: auto;"></div>
+  <div id="log" class="mt-2 text-muted"></div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.4.0/minified/html5-qrcode.min.js"></script>
+<script>
+const logEl = document.getElementById('log');
+function log(t){ logEl.innerText = t; }
+
+const html5QrCode = new Html5Qrcode("reader");
+const cfg = { fps: 10, qrbox: 250 };
+
+function parsePayload(s){
+  const p = s.split('|');
+  if (p.length !== 4) return null;
+  return { session_id: p[0], idx: p[1], code: p[2], sig: p[3] };
+}
+
+function onScanSuccess(decodedText){
+  const student = document.getElementById('studentId').value.trim();
+  if(!student){ log('Enter your student id first'); return; }
+  const pl = parsePayload(decodedText);
+  if(!pl){ log('Invalid QR data'); return; }
+  fetch('/student/scan', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ...pl, student_id: student })
+  }).then(r => r.json()).then(j => {
+    if (j.ok) log(`Scan: ${j.attendance} (scans=${j.scans_count})`);
+    else log(`Error: ${j.error || 'unknown'}`);
+  }).catch(() => log('Network error'));
+}
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(devices[0].id, cfg, onScanSuccess);
+  } else log('No camera found');
+}).catch(err => log('Camera init error: ' + err));
+</script>
+{% endblock %}
