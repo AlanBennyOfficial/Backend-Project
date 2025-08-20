@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Teacher – QR Attendance</title>
+	<link rel="stylesheet" href="style.css">
+	<script src="qrcode.min.js"></script>
+	<script defer src="script.js"></script>
+	<script src="qrcode-generator.min.js"></script>
+</head>
+<body>
+	<h1>Teacher Dashboard</h1>
+	<button id="start-btn">Start 30s Session</button>
+	<div id="meta"></div>
+	<div id="qrcode"></div>
+	<p class="muted">Each QR is valid for ~2 seconds. Students must scan 2 different codes.</p>
+
+	<h2>Manual Attendance (optional)</h2>
+	<div class="inline">
+		<input id="manual-student-id" placeholder="student-id">
+		<button id="mark-present-btn">Mark Present</button>
+	</div>
+	<table id="attendance-table">
+		<thead><tr><th>Student ID</th><th>Status</th></tr></thead>
+		<tbody></tbody>
+	</table>
+	<button id="export-btn">Export CSV</button>
+</body>
+</html>

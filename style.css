@@ -1,0 +1,26 @@
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 24px; }
+.muted { color: #666; font-size: 0.9rem; }
+.inline { display: flex; gap: 8px; margin-bottom: 12px; }
+input { padding: 8px 10px; }
+button { padding: 8px 12px; cursor: pointer; }
+table { border-collapse: collapse; margin-top: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+#scan-status { margin-top: 12px; }
+:root{
+  --bg: #000000;
+  --text-color: #ffffff;
+}
+
+#qrcode {
+  width: 90vmin;   /* take up 90% of the smaller screen dimension */
+  height: 90vmin;  /* keeps it a perfect square */
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#qrcode img, #qrcode canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* keeps modules crisp */
+}
