@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Face Recognition Attendance</h1>
+        <form id="recognition-form">
+            <div class="inline">
+                <label for="mode">Mode:</label>
+                <select id="mode" name="mode">
+                    <option value="streams">Streams</option>
+                    <option value="photo">Photo</option>
+                </select>
+                <div id="stream-input">
+                    <label for="stream_sources">Stream Sources (comma-separated):</label>
+                    <input type="text" id="stream_sources" name="stream_sources" value="0">
+                </div>
+                <div id="photo-input" style="display: none;">
+                    <label for="photo_path">Photo:</label>
+                    <input type="file" id="photo_path" name="photo_path" accept="image/*">
+                </div>
+            </div>
+            <div class="inline">
+                <button type="submit">Start Recognition</button>
+                <button id="stop-face-recognition" type="button">Stop Recognition</button>
+                <button id="load-video" type="button">Load Video</button> <!-- New button -->
+            </div>
+        </form>
+        <img id="video-feed" src="" width="640" height="480" style="display: none;">
+        <h2>Attendance</h2>
+        <table id="face-attendance-table">
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <a href="/download_attendance" class="button">Download Attendance as CSV</a>
+        <a href="/">Back to Home</a>
+    </div>
+    <script>
+        const modeSelect = document.getElementById("mode");
+        const streamInput = document.getElementById("stream-input");
+        const photoInput = document.getElementById("photo-input");
+        const videoFeed = document.getElementById('video-feed');
+        const loadVideoButton = document.getElementById('load-video');
+
+        modeSelect.addEventListener("change", () => {
+            if (modeSelect.value === "photo") {
+                streamInput.style.display = "none";
+                photoInput.style.display = "block";
+            } else {
+                streamInput.style.display = "block";
+                photoInput.style.display = "none";
+            }
+        });
+
+        document.getElementById("recognition-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const mode = formData.get("mode");
+
+            if (mode === "streams") {
+                const data = {
+                    mode: "streams",
+                    stream_sources: formData.get("stream_sources")
+                };
+                fetch("/start_face_recognition", {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(() => {
+                    videoFeed.src = "/video_feed?" + new Date().getTime(); // Bust cache
+                    videoFeed.style.display = 'block';
+                });
+            } else if (mode === "photo") {
+                const photoData = new FormData();
+                photoData.append('photo', document.getElementById('photo_path').files[0]);
+                fetch("/recognize_photo", {
+                    method: "POST",
+                    body: photoData
+                });
+            }
+        });
+
+        document.getElementById("stop-face-recognition").addEventListener("click", () => {
+            fetch("/stop_face_recognition").then(() => {
+                videoFeed.src = ""; // Clear the video feed source
+                videoFeed.style.display = 'none';
+            });
+        });
+
+        loadVideoButton.addEventListener('click', () => {
+            videoFeed.src = "/video_feed?" + new Date().getTime();
+            videoFeed.style.display = 'block';
+        });
+
+        setInterval(() => {
+            fetch("/api/face_attendance")
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector("#face-attendance-table tbody");
+                    tableBody.innerHTML = "";
+                    for (const [name, status] of Object.entries(data)) {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `<td>${name}</td><td>${status}</td>`;
+                        tableBody.appendChild(row);
+                    }
+                });
+        }, 2000); // Poll every 2 seconds
+    </script>
+</body>
+</html>

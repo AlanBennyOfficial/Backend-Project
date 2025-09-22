@@ -1,0 +1,10 @@
+
+flask
+requests
+insightface
+opencv-python
+numpy
+pandas
+onnxruntime-gpu
+mysql-connector-python
+Werkzeug

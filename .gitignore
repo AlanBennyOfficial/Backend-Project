@@ -1,7 +1,10 @@
+Archive/
 Archive2/
 Archive3/
 node_modules/
 dataset/
+uploads/
+__pycache__/
 .vscode/
 .venv/
 classroom.jpeg
