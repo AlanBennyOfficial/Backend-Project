@@ -17,8 +17,8 @@
                     <option value="photo">Photo</option>
                 </select>
                 <div id="stream-input">
-                    <label for="stream_sources">Stream Sources (comma-separated):</label>
-                    <input type="text" id="stream_sources" name="stream_sources" value="0">
+                    <label for="camera-select">Choose Camera:</label>
+                    <select id="camera-select" name="camera_id"></select>
                 </div>
                 <div id="photo-input" style="display: none;">
                     <label for="photo_path">Photo:</label>
@@ -28,10 +28,9 @@
             <div class="inline">
                 <button type="submit">Start Recognition</button>
                 <button id="stop-face-recognition" type="button">Stop Recognition</button>
-                <button id="load-video" type="button">Load Video</button> <!-- New button -->
             </div>
         </form>
-        <img id="video-feed" src="" width="640" height="480" style="display: none;">
+        <img id="video-feed" style="display: none;">
         <h2>Attendance</h2>
         <table id="face-attendance-table">
             <thead>
@@ -51,73 +50,168 @@
         const streamInput = document.getElementById("stream-input");
         const photoInput = document.getElementById("photo-input");
         const videoFeed = document.getElementById('video-feed');
-        const loadVideoButton = document.getElementById('load-video');
+        const cameraSelect = document.getElementById('camera-select');
+        const startRecognitionBtn = document.querySelector('#recognition-form button[type="submit"]');
+        const stopRecognitionBtn = document.getElementById('stop-face-recognition');
 
+        let currentStream;
+        let recognitionInterval;
+
+        // Function to enumerate cameras and populate the dropdown
+        async function getCameras() {
+            try {
+                // Request camera permissions first to ensure device labels are available
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                cameraSelect.innerHTML = ''; // Clear existing options
+                if (videoDevices.length > 0) {
+                    videoDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = index; // Use numerical index as value
+                        option.text = device.label || `Camera ${index + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+                    startRecognitionBtn.disabled = false; // Enable button if cameras are found
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.text = 'No camera found';
+                    cameraSelect.appendChild(option);
+                    startRecognitionBtn.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error enumerating devices or accessing camera:', error);
+                const option = document.createElement('option');
+                option.value = '';
+                option.text = 'Error accessing cameras (permissions denied or no camera)';
+                cameraSelect.appendChild(option);
+                startRecognitionBtn.disabled = true;
+            }
+        }
+
+        // Function to start the video stream (from backend)
+        async function startVideoStream(deviceId) {
+            // The video stream is now served by the backend, so we just set the img src
+            videoFeed.src = "/video_feed?timestamp=" + new Date().getTime(); // Bust cache
+            videoFeed.style.display = 'block';
+        }
+
+        // Function to stop the video stream
+        function stopVideoStream() {
+            videoFeed.src = ""; // Clear the image source
+            videoFeed.style.display = 'none';
+        }
+
+        // Function to start face recognition (backend polling)
+        function startFaceRecognitionPolling() {
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+            }
+            recognitionInterval = setInterval(() => {
+                fetch("/api/face_attendance")
+                    .then(response => response.json())
+                    .then(data => {
+                        const tableBody = document.querySelector("#face-attendance-table tbody");
+                        tableBody.innerHTML = "";
+                        for (const [name, status] of Object.entries(data)) {
+                            const row = document.createElement("tr");
+                            row.innerHTML = `<td>${name}</td><td>${status}`;
+                            tableBody.appendChild(row);
+                        }
+                    }).catch(error => console.error('Error fetching attendance:', error));
+            }, 2000);
+        }
+
+        // Function to stop face recognition (backend polling)
+        function stopFaceRecognitionPolling() {
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+                recognitionInterval = null;
+            }
+        }
+
+        // Event listener for mode selection
         modeSelect.addEventListener("change", () => {
             if (modeSelect.value === "photo") {
                 streamInput.style.display = "none";
                 photoInput.style.display = "block";
-            } else {
+                stopVideoStream();
+                stopFaceRecognitionPolling();
+            }
+            else {
                 streamInput.style.display = "block";
                 photoInput.style.display = "none";
+                getCameras(); // Re-enumerate cameras when switching back to streams
+                // Do not start stream automatically here, wait for user click
             }
         });
 
-        document.getElementById("recognition-form").addEventListener("submit", (event) => {
+        // Event listener for Start Recognition button
+        startRecognitionBtn.addEventListener("click", async (event) => {
             event.preventDefault();
-            const formData = new FormData(event.target);
-            const mode = formData.get("mode");
+            const mode = modeSelect.value;
 
             if (mode === "streams") {
-                const data = {
-                    mode: "streams",
-                    stream_sources: formData.get("stream_sources")
-                };
+                const selectedCameraIndex = cameraSelect.value; // Get the numerical index
+                if (selectedCameraIndex === '') {
+                    alert('Please select a camera.');
+                    return;
+                }
+                // No need to call startVideoStream here, as the backend will handle the stream
+
+                // Send request to backend to start processing the stream
                 fetch("/start_face_recognition", {
                     method: "POST",
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({ mode: "streams", stream_sources: selectedCameraIndex })
                 }).then(() => {
-                    videoFeed.src = "/video_feed?" + new Date().getTime(); // Bust cache
+                    // Start polling for attendance updates
+                    startFaceRecognitionPolling();
+                    // Display the video feed from the backend
+                    videoFeed.src = "/video_feed?timestamp=" + new Date().getTime(); // Bust cache
                     videoFeed.style.display = 'block';
-                });
+                }).catch(error => console.error('Error starting backend recognition:', error));
+
             } else if (mode === "photo") {
+                const photoFile = document.getElementById('photo_path').files[0];
+                if (!photoFile) {
+                    alert('Please select a photo.');
+                    return;
+                }
                 const photoData = new FormData();
-                photoData.append('photo', document.getElementById('photo_path').files[0]);
+                photoData.append('photo', photoFile);
                 fetch("/recognize_photo", {
                     method: "POST",
                     body: photoData
-                });
+                }).then(() => {
+                    // Start polling for attendance updates after photo recognition
+                    startFaceRecognitionPolling();
+                }).catch(error => console.error('Error recognizing photo:', error));
             }
         });
 
-        document.getElementById("stop-face-recognition").addEventListener("click", () => {
-            fetch("/stop_face_recognition").then(() => {
-                videoFeed.src = ""; // Clear the video feed source
-                videoFeed.style.display = 'none';
-            });
+        // Event listener for Stop Recognition button
+        stopRecognitionBtn.addEventListener("click", () => {
+            stopVideoStream();
+            stopFaceRecognitionPolling();
+            fetch("/stop_face_recognition").catch(error => console.error('Error stopping backend recognition:', error));
         });
 
-        loadVideoButton.addEventListener('click', () => {
-            videoFeed.src = "/video_feed?" + new Date().getTime();
-            videoFeed.style.display = 'block';
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            if (modeSelect.value === 'streams') {
+                getCameras();
+            }
         });
 
-        setInterval(() => {
-            fetch("/api/face_attendance")
-                .then(response => response.json())
-                .then(data => {
-                    const tableBody = document.querySelector("#face-attendance-table tbody");
-                    tableBody.innerHTML = "";
-                    for (const [name, status] of Object.entries(data)) {
-                        const row = document.createElement("tr");
-                        row.innerHTML = `<td>${name}</td><td>${status}</td>`;
-                        tableBody.appendChild(row);
-                    }
-                });
-        }, 2000); // Poll every 2 seconds
+        // Listen for changes in media devices (e.g., camera connected/disconnected)
+        navigator.mediaDevices.addEventListener('devicechange', getCameras);
+
     </script>
 </body>
 </html>

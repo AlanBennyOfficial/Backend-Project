@@ -62,7 +62,7 @@ if ($("#start-btn")) {
       const code = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
       const tsSec = nowSec();
       const expSec = tsSec + lifetimeSec;
-
+       
       // Build compact numeric payload (fits QR v1 numeric capacity)
       // Format: v(1) | sid(6) | seq(2) | code(6) | ts(10) | exp(10)  => total 35 digits
       const seqStr = pad(seq, 2);
@@ -80,7 +80,6 @@ if ($("#start-btn")) {
           fallbackQr.clear();
           fallbackQr._htOption.width = qrSize;
           fallbackQr._htOption.height = qrSize;
-          fallbackQr.makeCode(payloadStr);
           const moduleSize = Math.floor(qrSize / 21); // 21 modules for version 1
           const imgTag = qrObj.createImgTag(moduleSize, 0);
           qrDiv.innerHTML = imgTag;
@@ -130,6 +129,36 @@ if ($("#start-btn")) {
 // ===== STUDENT PAGE =====
 if ($("#qr-reader")) {
   const statusEl = $("#scan-status");
+  const qrReaderDiv = $("#qr-reader");
+  let scanner = null; // Declare scanner here so it's accessible globally within this block
+
+  // Function to start the QR scanner
+  function startQrScanner() {
+    const myId = $("#student-id").value.trim();
+    if (!myId) {
+      statusEl.textContent = "Please enter and save your student id before scanning.";
+      return;
+    }
+
+    if (scanner) { // If scanner already exists, clear it before re-rendering
+      scanner.clear().then(() => {
+        scanner = null;
+        renderScanner();
+      }).catch(error => {
+        console.error("Failed to clear scanner: ", error);
+        renderScanner(); // Try to render anyway
+      });
+    } else {
+      renderScanner();
+    }
+
+    function renderScanner() {
+      qrReaderDiv.style.display = 'block'; // Show the QR reader div
+      scanner = new Html5QrcodeScanner("qr-reader", { fps: 12, qrbox: 240 });
+      scanner.render(onScanSuccess, onScanError);
+      statusEl.textContent = `Scanner started. Ready to scan for student ID: ${myId}`;
+    }
+  }
 
   // Remember student id locally
   $("#save-id").addEventListener("click", () => {
@@ -137,10 +166,17 @@ if ($("#qr-reader")) {
     if (!id) { statusEl.textContent = "Enter a student id first."; return; }
     localStorage.setItem("student-id", id);
     statusEl.textContent = `Saved id: ${id}`;
+    startQrScanner(); // Start scanner after saving ID
   });
   // restore if saved
   const sidSaved = localStorage.getItem("student-id");
-  if (sidSaved) $("#student-id").value = sidSaved;
+  if (sidSaved) {
+    $("#student-id").value = sidSaved;
+    startQrScanner(); // Start scanner if ID is already saved
+  } else {
+    qrReaderDiv.style.display = 'none'; // Hide QR reader if no ID is saved
+    statusEl.textContent = "Please enter and save your student ID to start scanning.";
+  }
 
   // Track scans per session to ensure "two different codes"
   function getScannedSet(sessionId) {
@@ -210,6 +246,41 @@ if ($("#qr-reader")) {
     const scans = scanned.size;
     if (scans >= 2) {
       statusEl.textContent = `✅ Marked PRESENT (id=${myId}). You scanned ${scans} codes in session ${p.sid}.`;
+      // Send attendance to backend
+      fetch("/submit_student_qr_attendance", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ student_id: myId, session_id: p.sid })
+      }).then(response => response.json())
+        .then(data => {
+          console.log("Backend response for attendance submission:", data);
+          if (data.success) {
+            console.log("Attendance submitted successfully:", data.message);
+            statusEl.textContent = `✅ ${data.message}`;
+            if (scanner) {
+              console.log("Attempting to clear scanner...");
+              scanner.clear().then(() => {
+                console.log("Scanner cleared successfully. Hiding QR reader div.");
+                qrReaderDiv.style.display = 'none'; // Hide the QR reader div after scanner clears
+              }).catch(error => {
+                console.error("Failed to clear scanner after successful attendance: ", error);
+                qrReaderDiv.style.display = 'none'; // Hide anyway if clear fails
+              });
+            } else {
+              console.warn("Scanner object is null or undefined when trying to clear.");
+              qrReaderDiv.style.display = 'none'; // Hide anyway
+            }
+          } else {
+            console.error("Error submitting attendance:", data.message);
+            statusEl.textContent = `Error: ${data.message}`;
+          }
+        })
+        .catch(error => {
+          console.error("Network error submitting attendance:", error);
+          statusEl.textContent = "Network error. Please try again.";
+        });
       // (Optional) keep a local note for the student
       localStorage.setItem(`present-${p.sid}-${myId}`, "true");
     } else if (scanned.size > before) {
@@ -221,6 +292,8 @@ if ($("#qr-reader")) {
 
   function onScanError() { /* ignore noisy frames */ }
 
-  const scanner = new Html5QrcodeScanner("qr-reader", { fps: 12, qrbox: 240 });
-  scanner.render(onScanSuccess, onScanError);
+  // Initial state: hide QR reader if no ID is saved
+  if (!sidSaved) {
+    qrReaderDiv.style.display = 'none';
+  }
 }

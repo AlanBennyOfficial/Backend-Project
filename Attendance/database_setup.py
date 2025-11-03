@@ -67,11 +67,12 @@ def populate_students(cursor):
     student_names = [name for name in os.listdir(DATASET_PATH) if os.path.isdir(os.path.join(DATASET_PATH, name))]
 
     for name in student_names:
+        display_name = name.replace("-", " ") # Convert 'firstname-lastname' to 'firstname lastname'
         # Check if student already exists
-        cursor.execute("SELECT id FROM students WHERE name = %s", (name,))
+        cursor.execute("SELECT id FROM students WHERE name = %s", (display_name,))
         if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO students (name) VALUES (%s)", (name,))
-            print(f"Inserted student: {name}")
+            cursor.execute("INSERT INTO students (name) VALUES (%s)", (display_name,))
+            print(f"Inserted student: {display_name}")
 
 if __name__ == "__main__":
     create_database()

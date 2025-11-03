@@ -30,6 +30,19 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 import logging
 import argparse
+import mysql.connector
+from datetime import date
+import sys
+import os
+import importlib.util
+
+# Load config module dynamically from the parent directory
+config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config.py'))
+spec = importlib.util.spec_from_file_location("config", config_path)
+config = importlib.util.module_from_spec(spec)
+sys.modules['config'] = config
+spec.loader.exec_module(config)
+
 
 # ---------------------- HARDCODED CONFIG ----------------------
 # Put your dataset folder here (one image per student: name.jpg)
@@ -352,6 +365,45 @@ def run_photo_mode(app, scrfd, names, db_embs, photo_path):
     for (_,_,_,_,name,_) in draws:
         attendance[name] = "PRESENT"
     pd.DataFrame(list(attendance.items()), columns=["Name","Status"]).to_csv(csv_name,index=False)
+    
+    try:
+        with open("attendance.json", "w") as f:
+            json.dump(attendance, f)
+        print("[INFO] attendance.json updated.")
+    except IOError as e:
+        print(f"[ERROR] Failed to write to attendance.json: {e}")
+
+    try:
+        cnx = mysql.connector.connect(
+            host=config.DB_HOST,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            database=config.DB_NAME
+        )
+        cursor = cnx.cursor()
+        today = date.today().strftime('%Y-%m-%d')
+
+        for student_name, status in attendance.items():
+            # Get student_id from name
+            cursor.execute("SELECT id FROM students WHERE name = %s", (student_name,))
+            student = cursor.fetchall() # Explicitly fetch all results
+            if student:
+                student_id = student[0][0] # Access the ID from the fetched tuple
+                # Check if attendance for this student on this day already exists
+                cursor.execute("SELECT id FROM attendance WHERE student_id = %s AND date = %s", (student_id, today))
+                existing_attendance = cursor.fetchall() # Explicitly fetch all results
+                if existing_attendance:
+                    cursor.execute("UPDATE attendance SET status = %s WHERE student_id = %s AND date = %s", (status, student_id, today))
+                else:
+                    cursor.execute("INSERT INTO attendance (student_id, status, date) VALUES (%s, %s, %s)", (student_id, status, today))
+
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+        print("[INFO] Database updated.")
+    except mysql.connector.Error as err:
+        print(f"[ERROR] Database update failed: {err}")
+
     print(f"[INFO] Photo mode done. Saved {out_img} and {csv_name}")
 
 
@@ -363,6 +415,7 @@ def run_streams_mode(app, scrfd, names, db_embs, stream_sources):
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
+    print(f"[INFO] Streaming server started on port {HTTP_PORT}")
 
     streams = []
     for i, src in enumerate(stream_sources):
@@ -404,11 +457,17 @@ def run_streams_mode(app, scrfd, names, db_embs, stream_sources):
                 ret, jpeg = cv2.imencode('.jpg', annotated)
                 if ret:
                     output.write(jpeg.tobytes())
+                    # print(f"[INFO] Wrote JPEG frame to output for stream {s['src']}")
 
                 # Update attendance json
                 attendance_data = {name: ("PRESENT" if present else "ABSENT") for name, present in s["present"].items()}
-                with open("attendance.json", "w") as f:
-                    json.dump(attendance_data, f)
+                print(f"[DEBUG] Attendance data to write for stream {s['src']}: {attendance_data}")
+                try:
+                    with open("attendance.json", "w") as f:
+                        json.dump(attendance_data, f)
+                    print(f"[INFO] attendance.json updated for stream {s['src']}")
+                except IOError as e:
+                    print(f"[ERROR] Failed to write to attendance.json for stream {s['src']}: {e}")
 
             elapsed = time.time() - start
             sleep_for = max(0.0, PROCESS_INTERVAL - elapsed)
