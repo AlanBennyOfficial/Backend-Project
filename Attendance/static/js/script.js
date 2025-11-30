@@ -33,7 +33,8 @@ if ($("#start-btn")) {
   let fallbackQr = null;
   if (typeof QRCode !== "undefined") {
     // QRCode expects a container node or id; ensure qrDiv exists
-    fallbackQr = new QRCode(qrDiv, { width: screen.width*0.5, height: screen.width*0.5, align: "center", colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+    const size = qrDiv.clientWidth || 250;
+    fallbackQr = new QRCode(qrDiv, { width: size, height: size, align: "center", colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
   }
 
   let running = false;
@@ -62,7 +63,7 @@ if ($("#start-btn")) {
       const code = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
       const tsSec = nowSec();
       const expSec = tsSec + lifetimeSec;
-       
+
       // Build compact numeric payload (fits QR v1 numeric capacity)
       // Format: v(1) | sid(6) | seq(2) | code(6) | ts(10) | exp(10)  => total 35 digits
       const seqStr = pad(seq, 2);
@@ -76,15 +77,20 @@ if ($("#start-btn")) {
           const qrObj = qrcode(typeNumber, errorLevel);
           qrObj.addData(payloadStr);
           qrObj.make();
-          const qrSize = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.9);
-          fallbackQr.clear();
-          fallbackQr._htOption.width = qrSize;
-          fallbackQr._htOption.height = qrSize;
-          const moduleSize = Math.floor(qrSize / 21); // 21 modules for version 1
+          // Use container size, fallback to 250 if 0
+          const qrSize = qrDiv.clientWidth || 250;
+
+          if (fallbackQr) {
+            fallbackQr.clear();
+            // Update fallbackQr size if possible (some libs don't support dynamic resize easily)
+            // But we are regenerating the img tag below anyway for this branch
+          }
+
+          const moduleSize = Math.max(2, Math.floor(qrSize / 21)); // Ensure at least 2px per module
           const imgTag = qrObj.createImgTag(moduleSize, 0);
           qrDiv.innerHTML = imgTag;
 
-          
+
         } catch (e) {
           // If qrcode-generator fails for any reason, fallback to older QR library
           if (fallbackQr) fallbackQr.makeCode(payloadStr);
@@ -98,7 +104,7 @@ if ($("#start-btn")) {
 
       seq++;
       left -= 2;
-      meta.textContent = `Session: ${sessionId} • Time left: ${Math.max(left,0)}s`;
+      meta.textContent = `Session: ${sessionId} • Time left: ${Math.max(left, 0)}s`;
       setTimeout(tick, lifetimeSec * 1000);
     };
     tick();
@@ -191,12 +197,12 @@ if ($("#qr-reader")) {
     // Expected length: 35 digits
     if (!/^\d{35}$/.test(s)) return null;
     try {
-      const v = Number(s.slice(0,1));
-      const sid = s.slice(1,7);            // 6 digits
-      const seq = Number(s.slice(7,9));    // 2 digits
-      const code = s.slice(9,15);          // 6 digits
-      const tsSec = Number(s.slice(15,25)); // 10 digits
-      const expSec = Number(s.slice(25,35)); // 10 digits
+      const v = Number(s.slice(0, 1));
+      const sid = s.slice(1, 7);            // 6 digits
+      const seq = Number(s.slice(7, 9));    // 2 digits
+      const code = s.slice(9, 15);          // 6 digits
+      const tsSec = Number(s.slice(15, 25)); // 10 digits
+      const expSec = Number(s.slice(25, 35)); // 10 digits
       return { v, sid, seq, code, ts: tsSec * 1000, exp: expSec * 1000 };
     } catch (e) { return null; }
   }
@@ -220,8 +226,8 @@ if ($("#qr-reader")) {
     // Validate structure (support both formats)
     // JSON format used ms (as original); numeric format we converted ts/exp to ms above.
     if (!(p && (p.v === 1) && typeof p.sid === "string" && typeof p.seq === "number" &&
-          (/^\d{6}$/.test(String(p.code)) || typeof p.code === "number") &&
-          typeof p.ts === "number" && typeof p.exp === "number")) {
+      (/^\d{6}$/.test(String(p.code)) || typeof p.code === "number") &&
+      typeof p.ts === "number" && typeof p.exp === "number")) {
       statusEl.textContent = "Malformed QR.";
       return;
     }

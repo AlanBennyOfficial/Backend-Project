@@ -46,7 +46,7 @@ spec.loader.exec_module(config)
 
 # ---------------------- HARDCODED CONFIG ----------------------
 # Put your dataset folder here (one image per student: name.jpg)
-DATASET_DIR = "dataset"
+DATASET_DIR = "C:\GitHub\Backend-Project\Attendance\dataset"
 
 # Use GPU if available. CTX_ID = 0 -> GPU, -1 -> CPU
 # Keep 0 for CUDA preference; the code will catch exceptions and retry on CPU if truly unavailable.

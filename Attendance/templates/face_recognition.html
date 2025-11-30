@@ -1,217 +1,321 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Recognition Attendance</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Face Recognition Attendance</h1>
-        <form id="recognition-form">
-            <div class="inline">
-                <label for="mode">Mode:</label>
-                <select id="mode" name="mode">
-                    <option value="streams">Streams</option>
-                    <option value="photo">Photo</option>
-                </select>
-                <div id="stream-input">
-                    <label for="camera-select">Choose Camera:</label>
-                    <select id="camera-select" name="camera_id"></select>
-                </div>
-                <div id="photo-input" style="display: none;">
-                    <label for="photo_path">Photo:</label>
-                    <input type="file" id="photo_path" name="photo_path" accept="image/*">
-                </div>
-            </div>
-            <div class="inline">
-                <button type="submit">Start Recognition</button>
-                <button id="stop-face-recognition" type="button">Stop Recognition</button>
-            </div>
-        </form>
-        <img id="video-feed" style="display: none;">
-        <h2>Attendance</h2>
-        <table id="face-attendance-table">
-            <thead>
-                <tr>
-                    <th>Student Name</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-        <a href="/download_attendance" class="button">Download Attendance as CSV</a>
-        <a href="/">Back to Home</a>
+{% extends "base.html" %}
+
+{% block title %}Face Recognition - Nipe Attendance{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold mb-4">Face <span class="gradient-text">Recognition</span></h1>
+        <p class="text-slate-400">Automated attendance using advanced facial recognition.</p>
     </div>
-    <script>
-        const modeSelect = document.getElementById("mode");
-        const streamInput = document.getElementById("stream-input");
-        const photoInput = document.getElementById("photo-input");
-        const videoFeed = document.getElementById('video-feed');
-        const cameraSelect = document.getElementById('camera-select');
-        const startRecognitionBtn = document.querySelector('#recognition-form button[type="submit"]');
-        const stopRecognitionBtn = document.getElementById('stop-face-recognition');
 
-        let currentStream;
-        let recognitionInterval;
+    <div id="main-grid"
+        class="grid grid-cols-1 lg:grid-cols-[320px_1fr_380px] gap-6 h-auto lg:h-[calc(100vh-14rem)] transition-all duration-300">
+        <!-- Control Panel (Left) -->
+        <div class="lg:col-span-1 flex flex-col h-full">
+            <div class="glass-panel rounded-2xl p-6 flex flex-col h-full overflow-y-auto">
+                <h3 class="text-xl font-semibold mb-4 flex items-center flex-shrink-0">
+                    <i class="fas fa-sliders-h mr-2 text-indigo-400"></i> Controls
+                </h3>
 
-        // Function to enumerate cameras and populate the dropdown
-        async function getCameras() {
-            try {
-                // Request camera permissions first to ensure device labels are available
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+                <form id="recognition-form" class="space-y-4 flex-grow">
+                    <div>
+                        <label for="mode" class="block text-sm font-medium text-slate-300 mb-1">Detection Mode</label>
+                        <select id="mode" name="mode"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all">
+                            <option value="streams">Live Camera Stream</option>
+                            <option value="photo">Upload Photo</option>
+                        </select>
+                    </div>
 
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                cameraSelect.innerHTML = ''; // Clear existing options
-                if (videoDevices.length > 0) {
-                    videoDevices.forEach((device, index) => {
-                        const option = document.createElement('option');
-                        option.value = index; // Use numerical index as value
-                        option.text = device.label || `Camera ${index + 1}`;
-                        cameraSelect.appendChild(option);
-                    });
-                    startRecognitionBtn.disabled = false; // Enable button if cameras are found
-                } else {
+                    <div id="stream-input">
+                        <label for="camera-select" class="block text-sm font-medium text-slate-300 mb-1">Select
+                            Camera</label>
+                        <select id="camera-select" name="camera_id"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"></select>
+                    </div>
+
+                    <div id="photo-input" style="display: none;">
+                        <label for="photo_path" class="block text-sm font-medium text-slate-300 mb-1">Upload
+                            Photo</label>
+                        <input type="file" id="photo_path" name="photo_path" accept="image/*"
+                            class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20 transition-all">
+                    </div>
+
+                    <div class="pt-4 space-y-3 mt-auto">
+                        <button type="submit"
+                            class="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-play mr-2"></i> Start Recognition
+                        </button>
+                        <button id="stop-face-recognition" type="button"
+                            class="w-full py-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium transition-all border border-red-500/20 flex items-center justify-center">
+                            <i class="fas fa-stop mr-2"></i> Stop Recognition
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Video Feed (Center) -->
+        <div id="video-panel"
+            class="lg:col-span-1 flex flex-col h-full justify-top items-center transition-all duration-300 overflow-hidden">
+            <div id="video-container"
+                class="glass-panel rounded-2xl p-2 flex items-center justify-center relative overflow-hidden bg-black/40 w-auto h-auto max-w-full max-h-full">
+                <img id="video-feed" style="display: none;"
+                    class="max-w-full max-h-full object-contain rounded-xl shadow-2xl">
+
+                <!-- Placeholder when no video -->
+                <div id="video-placeholder" class="text-center text-slate-500 p-8">
+                    <div class="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-video-slash text-3xl"></i>
+                    </div>
+                    <p class="text-lg">Camera feed is currently inactive</p>
+                    <p class="text-sm opacity-70">Select a camera and click Start to begin</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Attendance (Right) -->
+        <div class="lg:col-span-1 flex flex-col h-full overflow-y-auto">
+            <div class="glass-panel rounded-2xl p-6 flex flex-col h-full overflow-hidden">
+                <h3 class="text-xl font-semibold mb-4 flex items-center flex-shrink-0">
+                    <i class="fas fa-list-check mr-2 text-green-400"></i> Live Attendance
+                </h3>
+                <div class="overflow-y-auto flex-grow pr-1 custom-scrollbar">
+                    <table id="face-attendance-table" class="w-full text-left">
+                        <thead
+                            class="text-xs text-slate-400 uppercase bg-slate-800/50 sticky top-0 backdrop-blur-md z-10">
+                            <tr>
+                                <th class="px-4 py-3 rounded-l-lg cursor-pointer hover:text-white transition-colors"
+                                    onclick="sortTable(0, 'face-attendance-table')">
+                                    Name <i class="fas fa-sort ml-1 text-xs opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 rounded-r-lg text-center cursor-pointer hover:text-white transition-colors"
+                                    onclick="sortTable(1, 'face-attendance-table')">
+                                    Status <i class="fas fa-sort ml-1 text-xs opacity-50"></i>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/30 text-sm">
+                            <!-- Rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 pt-4 border-t border-slate-700/50 flex-shrink-0">
+                    <a href="/download_attendance"
+                        class="block w-full text-center py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors">
+                        <i class="fas fa-download mr-2"></i> Download CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const modeSelect = document.getElementById("mode");
+    const streamInput = document.getElementById("stream-input");
+    const photoInput = document.getElementById("photo-input");
+    const videoFeed = document.getElementById('video-feed');
+    const videoPlaceholder = document.getElementById('video-placeholder');
+    const cameraSelect = document.getElementById('camera-select');
+    const startRecognitionBtn = document.querySelector('#recognition-form button[type="submit"]');
+    const stopRecognitionBtn = document.getElementById('stop-face-recognition');
+
+    // Layout elements
+    const mainGrid = document.getElementById('main-grid');
+    const videoPanel = document.getElementById('video-panel');
+
+    let currentStream;
+    let recognitionInterval;
+
+    // Function to enumerate cameras and populate the dropdown
+    async function getCameras() {
+        try {
+            // Request camera permissions first to ensure device labels are available
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            cameraSelect.innerHTML = ''; // Clear existing options
+            if (videoDevices.length > 0) {
+                videoDevices.forEach((device, index) => {
                     const option = document.createElement('option');
-                    option.value = '';
-                    option.text = 'No camera found';
+                    option.value = index; // Use numerical index as value
+                    option.text = device.label || `Camera ${index + 1}`;
                     cameraSelect.appendChild(option);
-                    startRecognitionBtn.disabled = true;
-                }
-            } catch (error) {
-                console.error('Error enumerating devices or accessing camera:', error);
+                });
+                startRecognitionBtn.disabled = false; // Enable button if cameras are found
+            } else {
                 const option = document.createElement('option');
                 option.value = '';
-                option.text = 'Error accessing cameras (permissions denied or no camera)';
+                option.text = 'No camera found';
                 cameraSelect.appendChild(option);
                 startRecognitionBtn.disabled = true;
             }
+        } catch (error) {
+            console.error('Error enumerating devices or accessing camera:', error);
+            const option = document.createElement('option');
+            option.value = '';
+            option.text = 'Error accessing cameras';
+            cameraSelect.appendChild(option);
+            startRecognitionBtn.disabled = true;
         }
+    }
 
-        // Function to start the video stream (from backend)
-        async function startVideoStream(deviceId) {
-            // The video stream is now served by the backend, so we just set the img src
-            videoFeed.src = "/video_feed?timestamp=" + new Date().getTime(); // Bust cache
-            videoFeed.style.display = 'block';
+    // Function to start the video stream (from backend)
+    async function startVideoStream(deviceId) {
+        videoFeed.src = "/video_feed?timestamp=" + new Date().getTime(); // Bust cache
+        videoFeed.style.display = 'block';
+        videoPlaceholder.style.display = 'none';
+    }
+
+    // Function to stop the video stream
+    function stopVideoStream() {
+        videoFeed.src = ""; // Clear the image source
+        videoFeed.style.display = 'none';
+        videoPlaceholder.style.display = 'block';
+    }
+
+    // Function to start face recognition (backend polling)
+    function startFaceRecognitionPolling() {
+        if (recognitionInterval) {
+            clearInterval(recognitionInterval);
         }
+        recognitionInterval = setInterval(() => {
+            fetch("/api/face_attendance")
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector("#face-attendance-table tbody");
+                    tableBody.innerHTML = "";
 
-        // Function to stop the video stream
-        function stopVideoStream() {
-            videoFeed.src = ""; // Clear the image source
-            videoFeed.style.display = 'none';
-        }
+                    if (Object.keys(data).length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="2" class="px-4 py-3 text-center text-slate-500 italic">No attendance marked yet</td></tr>';
+                        return;
+                    }
 
-        // Function to start face recognition (backend polling)
-        function startFaceRecognitionPolling() {
-            if (recognitionInterval) {
-                clearInterval(recognitionInterval);
-            }
-            recognitionInterval = setInterval(() => {
-                fetch("/api/face_attendance")
-                    .then(response => response.json())
-                    .then(data => {
-                        const tableBody = document.querySelector("#face-attendance-table tbody");
-                        tableBody.innerHTML = "";
-                        for (const [name, status] of Object.entries(data)) {
-                            const row = document.createElement("tr");
-                            row.innerHTML = `<td>${name}</td><td>${status}`;
-                            tableBody.appendChild(row);
+                    for (const [name, status] of Object.entries(data)) {
+                        const row = document.createElement("tr");
+                        row.className = "hover:bg-slate-800/30 transition-colors";
+                        // Determine status color
+                        let statusClass = "bg-green-500/10 text-green-400"; // Default Present
+                        const normalizedStatus = String(status).trim().toLowerCase();
+                        if (normalizedStatus === "absent") {
+                            statusClass = "bg-red-500/10 text-red-400";
                         }
-                    }).catch(error => console.error('Error fetching attendance:', error));
-            }, 2000);
+
+                        row.innerHTML = `
+                            <td class="px-4 py-3 font-medium text-white">${name}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
+                                    ${status}
+                                </span>
+                            </td>`;
+                        tableBody.appendChild(row);
+                    }
+                }).catch(error => console.error('Error fetching attendance:', error));
+        }, 2000);
+    }
+
+    // Function to stop face recognition (backend polling)
+    function stopFaceRecognitionPolling() {
+        if (recognitionInterval) {
+            clearInterval(recognitionInterval);
+            recognitionInterval = null;
         }
+    }
 
-        // Function to stop face recognition (backend polling)
-        function stopFaceRecognitionPolling() {
-            if (recognitionInterval) {
-                clearInterval(recognitionInterval);
-                recognitionInterval = null;
-            }
-        }
-
-        // Event listener for mode selection
-        modeSelect.addEventListener("change", () => {
-            if (modeSelect.value === "photo") {
-                streamInput.style.display = "none";
-                photoInput.style.display = "block";
-                stopVideoStream();
-                stopFaceRecognitionPolling();
-            }
-            else {
-                streamInput.style.display = "block";
-                photoInput.style.display = "none";
-                getCameras(); // Re-enumerate cameras when switching back to streams
-                // Do not start stream automatically here, wait for user click
-            }
-        });
-
-        // Event listener for Start Recognition button
-        startRecognitionBtn.addEventListener("click", async (event) => {
-            event.preventDefault();
-            const mode = modeSelect.value;
-
-            if (mode === "streams") {
-                const selectedCameraIndex = cameraSelect.value; // Get the numerical index
-                if (selectedCameraIndex === '') {
-                    alert('Please select a camera.');
-                    return;
-                }
-                // No need to call startVideoStream here, as the backend will handle the stream
-
-                // Send request to backend to start processing the stream
-                fetch("/start_face_recognition", {
-                    method: "POST",
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ mode: "streams", stream_sources: selectedCameraIndex })
-                }).then(() => {
-                    // Start polling for attendance updates
-                    startFaceRecognitionPolling();
-                    // Display the video feed from the backend
-                    videoFeed.src = "/video_feed?timestamp=" + new Date().getTime(); // Bust cache
-                    videoFeed.style.display = 'block';
-                }).catch(error => console.error('Error starting backend recognition:', error));
-
-            } else if (mode === "photo") {
-                const photoFile = document.getElementById('photo_path').files[0];
-                if (!photoFile) {
-                    alert('Please select a photo.');
-                    return;
-                }
-                const photoData = new FormData();
-                photoData.append('photo', photoFile);
-                fetch("/recognize_photo", {
-                    method: "POST",
-                    body: photoData
-                }).then(() => {
-                    // Start polling for attendance updates after photo recognition
-                    startFaceRecognitionPolling();
-                }).catch(error => console.error('Error recognizing photo:', error));
-            }
-        });
-
-        // Event listener for Stop Recognition button
-        stopRecognitionBtn.addEventListener("click", () => {
+    // Event listener for mode selection
+    modeSelect.addEventListener("change", () => {
+        if (modeSelect.value === "photo") {
+            streamInput.style.display = "none";
+            photoInput.style.display = "block";
             stopVideoStream();
             stopFaceRecognitionPolling();
-            fetch("/stop_face_recognition").catch(error => console.error('Error stopping backend recognition:', error));
-        });
 
-        // Initial setup
-        document.addEventListener('DOMContentLoaded', () => {
-            if (modeSelect.value === 'streams') {
-                getCameras();
+            // Switch to 2-column layout with priority to attendance
+            videoPanel.classList.add('hidden');
+            mainGrid.classList.remove('lg:grid-cols-[320px_1fr_380px]');
+            mainGrid.classList.add('lg:grid-cols-[320px_1fr]');
+        }
+        else {
+            streamInput.style.display = "block";
+            photoInput.style.display = "none";
+
+            // Switch to 3-column layout
+            videoPanel.classList.remove('hidden');
+            mainGrid.classList.remove('lg:grid-cols-[320px_1fr]');
+            mainGrid.classList.add('lg:grid-cols-[320px_1fr_380px]');
+
+            getCameras(); // Re-enumerate cameras when switching back to streams
+        }
+    });
+
+    // Event listener for Start Recognition button
+    startRecognitionBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        const mode = modeSelect.value;
+
+        if (mode === "streams") {
+            const selectedCameraIndex = cameraSelect.value; // Get the numerical index
+            if (selectedCameraIndex === '') {
+                alert('Please select a camera.');
+                return;
             }
-        });
 
-        // Listen for changes in media devices (e.g., camera connected/disconnected)
-        navigator.mediaDevices.addEventListener('devicechange', getCameras);
+            // Send request to backend to start processing the stream
+            fetch("/start_face_recognition", {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: "streams", stream_sources: selectedCameraIndex })
+            }).then(() => {
+                // Start polling for attendance updates
+                startFaceRecognitionPolling();
+                // Display the video feed from the backend
+                startVideoStream();
+            }).catch(error => console.error('Error starting backend recognition:', error));
 
-    </script>
-</body>
-</html>
+        } else if (mode === "photo") {
+            const photoFile = document.getElementById('photo_path').files[0];
+            if (!photoFile) {
+                alert('Please select a photo.');
+                return;
+            }
+            const photoData = new FormData();
+            photoData.append('photo', photoFile);
+            fetch("/recognize_photo", {
+                method: "POST",
+                body: photoData
+            }).then(() => {
+                // Start polling for attendance updates after photo recognition
+                startFaceRecognitionPolling();
+            }).catch(error => console.error('Error recognizing photo:', error));
+        }
+    });
+
+    // Event listener for Stop Recognition button
+    stopRecognitionBtn.addEventListener("click", () => {
+        stopVideoStream();
+        stopFaceRecognitionPolling();
+        fetch("/stop_face_recognition").catch(error => console.error('Error stopping backend recognition:', error));
+    });
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', () => {
+        if (modeSelect.value === 'streams') {
+            getCameras();
+        }
+        // Initialize table with empty state
+        document.querySelector("#face-attendance-table tbody").innerHTML = '<tr><td colspan="2" class="px-4 py-3 text-center text-slate-500 italic">No attendance marked yet</td></tr>';
+    });
+
+    // Listen for changes in media devices (e.g., camera connected/disconnected)
+    navigator.mediaDevices.addEventListener('devicechange', getCameras);
+
+</script>
+{% endblock %}

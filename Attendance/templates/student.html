@@ -1,26 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Student – Scan</title>
-	<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-	<script src="{{ url_for('static', filename='js/html5-qrcode.min.js') }}"></script>
-	<script defer src="{{ url_for('static', filename='js/script.js') }}"></script>
-	
-</head>
-<body>
-    <div class="container">
-        <h1>Student Scanner</h1>
+{% extends "base.html" %}
 
-        <div class="inline">
-            <input id="student-id" placeholder="student-id">
-            <button id="save-id">Save</button>
-        </div>
-        <p class="muted">Your ID is stored in this browser only.</p>
+{% block title %}Student Scanner - Nipe Attendance{% endblock %}
 
-        <div id="qr-reader"></div>
-        <div id="scan-status"></div>
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold mb-2">Student <span class="gradient-text">Scanner</span></h1>
+        <p class="text-slate-400">Scan your QR code to mark attendance.</p>
     </div>
-</body>
-</html>
+
+    <div class="glass-panel rounded-2xl p-6 shadow-xl">
+        <div class="mb-6">
+            <label for="student-id" class="block text-sm font-medium text-slate-300 mb-2">Student ID</label>
+            <div class="flex gap-2">
+                <input id="student-id" type="text" placeholder="Enter Student ID"
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all">
+                <button id="save-id"
+                    class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors shadow-lg shadow-indigo-500/25">
+                    Save
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Your ID is stored locally in this browser.</p>
+        </div>
+
+        <div id="qr-reader" class="rounded-xl overflow-hidden border-2 border-slate-700 mb-4"></div>
+
+        <div id="scan-status" class="text-center text-sm font-medium min-h-[24px]"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/html5-qrcode.min.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/script.js') }}"></script>
+<style>
+    /* Custom override for the QR reader to match the dark theme */
+    #qr-reader {
+        background-color: #000;
+    }
+
+    #qr-reader__scan_region {
+        background: transparent;
+    }
+
+    #qr-reader__dashboard_section_csr span,
+    #qr-reader__dashboard_section_swaplink {
+        color: #cbd5e1 !important;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NIPE Attendance{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/x-icon" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#6366f1', // Indigo 500
+                        secondary: '#ec4899', // Pink 500
+                        dark: '#0f172a', // Slate 900
+                        surface: '#1e293b', // Slate 800
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .gradient-text {
+            background: linear-gradient(to right, #818cf8, #f472b6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="bg-slate-900 text-slate-50 relative overflow-x-hidden">
+
+    <!-- Background Decoration -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div
+            class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob">
+        </div>
+        <div
+            class="absolute top-[-10%] right-[-10%] w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000">
+        </div>
+        <div
+            class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000">
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="glass-panel sticky top-0 z-50 border-b border-slate-700/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2 group">
+                        <div>
+                            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"
+                                class="w-8 h-8 rounded-lg">
+                        </div>
+                        <span class="text-xl font-bold tracking-tight">NIPE <span
+                                class="text-indigo-400">Attendance</span></span>
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="/"
+                            class="px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/' else 'text-slate-300' }}">Home</a>
+                        <a href="/manual"
+                            class="px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/manual' else 'text-slate-300' }}">Manual</a>
+                        <a href="/qr"
+                            class="px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/qr' else 'text-slate-300' }}">QR
+                            Code</a>
+                        <a href="/face"
+                            class="px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/face' else 'text-slate-300' }}">Face
+                            Rec</a>
+                        <a href="/attendance"
+                            class="px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/attendance' else 'text-slate-300' }}">Report</a>
+                    </div>
+                </div>
+                <div class="-mr-2 flex md:hidden">
+                    <button type="button" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+                        class="inline-flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-white">
+                        <span class="sr-only">Open main menu</span>
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu, show/hide based on menu state. -->
+        <div class="hidden md:hidden glass-panel border-t border-slate-700/50" id="mobile-menu">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="/"
+                    class="block px-3 py-2 rounded-md text-base font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/' else 'text-slate-300' }}">Home</a>
+                <a href="/manual"
+                    class="block px-3 py-2 rounded-md text-base font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/manual' else 'text-slate-300' }}">Manual</a>
+                <a href="/qr"
+                    class="block px-3 py-2 rounded-md text-base font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/qr' else 'text-slate-300' }}">QR
+                    Code</a>
+                <a href="/face"
+                    class="block px-3 py-2 rounded-md text-base font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/face' else 'text-slate-300' }}">Face
+                    Rec</a>
+                <a href="/attendance"
+                    class="block px-3 py-2 rounded-md text-base font-medium hover:text-white hover:bg-slate-700/50 transition-colors {{ 'text-white bg-slate-700/50' if request.path == '/attendance' else 'text-slate-300' }}">Report</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/50 backdrop-blur-sm mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-slate-500 text-sm">
+                &copy; {{ 2025 }} NIPE Attendance System. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+    <style>
+        @keyframes blob {
+            0% {
+                transform: translate(0px, 0px) scale(1);
+            }
+
+            33% {
+                transform: translate(30px, -50px) scale(1.1);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) scale(0.9);
+            }
+
+            100% {
+                transform: translate(0px, 0px) scale(1);
+            }
+        }
+
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+    </style>
+    {% block extra_js %}{% endblock %}
+    <script>
+        function sortTable(n, tableId) {
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById(tableId);
+            if (!table) return;
+            switching = true;
+            dir = "asc";
+            while (switching) {
+                switching = false;
+                // Get tbody to avoid header issues
+                var tbody = table.getElementsByTagName("tbody")[0];
+                if (tbody) {
+                    rows = tbody.rows;
+                } else {
+                    // Fallback if no tbody
+                    rows = table.rows;
+                }
+
+                for (i = 0; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[n];
+                    y = rows[i + 1].getElementsByTagName("TD")[n];
+
+                    let xContent = x.textContent.trim();
+                    let yContent = y.textContent.trim();
+
+                    if (dir == "asc") {
+                        if (xContent.toLowerCase() > yContent.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else if (dir == "desc") {
+                        if (xContent.toLowerCase() < yContent.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount == 0 && dir == "asc") {
+                        dir = "desc";
+                        switching = true;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

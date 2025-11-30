@@ -60,6 +60,10 @@ def manual_attendance_page():
         cursor = cnx.cursor(dictionary=True)
         cursor.execute("SELECT * FROM students")
         students = cursor.fetchall()
+        # Replace hyphens with spaces in student names
+        for student in students:
+            if student.get('name'):
+                student['name'] = student['name'].replace('-', ' ')
         cursor.close()
         cnx.close()
         return render_template("manual_attendance.html", students=students)
@@ -322,7 +326,10 @@ def face_attendance_api():
         cnx.commit()
         cursor.close()
         cnx.close()
-        return jsonify(attendance_data)
+        
+        # Replace hyphens with spaces in the response keys
+        sanitized_data = {name.replace('-', ' '): status for name, status in attendance_data.items()}
+        return jsonify(sanitized_data)
     except (FileNotFoundError, json.JSONDecodeError):
         return jsonify({})
     except mysql.connector.Error as err:
@@ -341,6 +348,10 @@ def attendance_report():
             LEFT JOIN attendance a ON s.id = a.student_id AND a.date = %s
         """, (today,))
         attendance_records = cursor.fetchall()
+        # Replace hyphens with spaces in student names
+        for record in attendance_records:
+            if record.get('name'):
+                record['name'] = record['name'].replace('-', ' ')
         cursor.close()
         cnx.close()
         return render_template("attendance_report.html", attendance=attendance_records, today=date.today().strftime('%B %d, %Y'))
@@ -358,7 +369,7 @@ def download_attendance():
         cw = csv.writer(si)
         cw.writerow(["Student Name", "Status"])
         for name, status in attendance_data.items():
-            cw.writerow([name, status])
+            cw.writerow([name.replace('-', ' '), status])
         
         output = si.getvalue()
         today = date.today().strftime('%Y-%m-%d')
@@ -391,7 +402,8 @@ def download_report():
         cw = csv.writer(si)
         cw.writerow(["Student Name", "Status"])
         for record in attendance_records:
-            cw.writerow([record['name'], record['status'] or 'Absent'])
+            name = record['name'].replace('-', ' ') if record.get('name') else ''
+            cw.writerow([name, record['status'] or 'Absent'])
         
         output = si.getvalue()
         return Response(
