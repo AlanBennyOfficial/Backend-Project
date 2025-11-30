@@ -1,30 +1,759 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Teacher – QR Attendance</title>
-	<link rel="stylesheet" href="style.css">
-	<script src="qrcode.min.js"></script>
-	<script defer src="script.js"></script>
-	<script src="qrcode-generator.min.js"></script>
-</head>
-<body>
-	<h1>Teacher Dashboard</h1>
-	<button id="start-btn">Start 30s Session</button>
-	<div id="meta"></div>
-	<div id="qrcode"></div>
-	<p class="muted">Each QR is valid for ~2 seconds. Students must scan 2 different codes.</p>
 
-	<h2>Manual Attendance (optional)</h2>
-	<div class="inline">
-		<input id="manual-student-id" placeholder="student-id">
-		<button id="mark-present-btn">Mark Present</button>
-	</div>
-	<table id="attendance-table">
-		<thead><tr><th>Student ID</th><th>Status</th></tr></thead>
-		<tbody></tbody>
-	</table>
-	<button id="export-btn">Export CSV</button>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIPE Attendance - Next Gen System</title>
+    <link rel="icon" href="<svg xmlns=" http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="lucide lucide-scan-icon lucide-scan">
+    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+    <path d="M7 21H5a2 2 0 0 1-2-2v-2" /></svg>" type="image/x-icon" />
+
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.5s ease-out',
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'gradient-x': 'gradientX 15s ease infinite',
+                        'scan': 'scan 2s linear infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        gradientX: {
+                            '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left center' },
+                            '50%': { 'background-size': '200% 200%', 'background-position': 'right center' },
+                        },
+                        scan: {
+                            '0%': { top: '0%' },
+                            '50%': { top: '100%' },
+                            '100%': { top: '0%' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 2. Import Map for React, Three.js, and Lucide -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "three": "https://esm.sh/three@0.160.0",
+            "three/examples/jsm/controls/OrbitControls.js": "https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        }
+    }
+    </script>
+
+    <!-- 3. Load Babel for JSX compiling in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            background-color: #020617;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <!-- 4. Your React Application Code -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+        import {
+            Scan, UserCheck, ShieldCheck, Database, Code, Cpu, Server, ChevronRight,
+            Github, Linkedin, CheckCircle2, XCircle, Zap, LayoutDashboard, Users,
+            Terminal, AlertTriangle, Lightbulb, ArrowRight, Smartphone, MapPin,
+            Share2, Lock, Box, Maximize
+        } from 'lucide-react';
+
+        const App = () => {
+            const [scrolled, setScrolled] = useState(false);
+            const [activeSection, setActiveSection] = useState('hero');
+            const [demoModalOpen, setDemoModalOpen] = useState(false);
+
+            useEffect(() => {
+                const handleScroll = () => {
+                    setScrolled(window.scrollY > 50);
+                    const sections = ['hero', 'problem', 'solution', 'tech', 'challenges', 'roadmap', 'team'];
+                    const current = sections.find(section => {
+                        const element = document.getElementById(section);
+                        if (element) {
+                            const rect = element.getBoundingClientRect();
+                            return rect.top >= 0 && rect.top <= 300;
+                        }
+                        return false;
+                    });
+                    if (current) setActiveSection(current);
+                };
+                window.addEventListener('scroll', handleScroll);
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, []);
+
+            const scrollToSection = (id) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                    setActiveSection(id);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-indigo-500 selection:text-white font-sans overflow-x-hidden">
+
+                    {/* Navigation */}
+                    <nav className={`fixed w-full z-50 transition-all duration-300 ${scrolled ? 'bg-slate-950/80 backdrop-blur-md border-b border-slate-800 py-3' : 'bg-transparent py-6'}`}>
+                        <div className="container mx-auto px-6 flex justify-between items-center">
+                            <div onClick={() => scrollToSection('hero')} className="flex items-center gap-2 font-bold text-xl tracking-tighter text-white cursor-pointer group">
+                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:rotate-12 transition-transform">
+                                    <Scan className="w-5 h-5 text-white" />
+                                </div>
+                                NIPE<span className="text-indigo-400">Attendance</span>
+                            </div>
+
+                            <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-400">
+                                {['Problem', 'Solution', 'Tech', 'Challenges', 'Roadmap', 'Team'].map((item) => (
+                                    <button key={item} onClick={() => scrollToSection(item.toLowerCase())} className={`hover:text-white transition-colors relative py-1 ${activeSection === item.toLowerCase() ? 'text-white' : ''}`}>
+                                        {item}
+                                        {activeSection === item.toLowerCase() && (
+                                            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-full animate-fade-in" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Live Demo button removed */}
+                        </div>
+                    </nav>
+
+                    {/* Hero Section */}
+                    <section id="hero" className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl -z-10 pointer-events-none">
+                            <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-[100px] animate-pulse" />
+                            <div className="absolute top-40 right-20 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] animation-delay-2000" />
+                            <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px]" />
+                        </div>
+
+                        <div className="container mx-auto max-w-6xl text-center">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-indigo-400 mb-8 animate-fade-in-up hover:border-indigo-500/50 transition-colors cursor-default">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                </span>
+                                v1.0 Stable Release • Oct 2025
+                            </div>
+
+                            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+                                Attendance Verified by <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient-x">
+                                    Code & Biometrics
+                                </span>
+                            </h1>
+
+                            <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+                                Eliminate proxy attendance with a dual-verification system combining dynamic QR codes and InsightFace recognition algorithms. Designed for the modern campus.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                                <button onClick={() => scrollToSection('solution')} className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all hover:shadow-lg hover:shadow-indigo-500/25 flex items-center justify-center gap-2 group">
+                                    Explore Architecture
+                                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </button>
+                                <button className="w-full sm:w-auto px-8 py-4 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl font-bold transition-all flex items-center justify-center gap-2 hover:border-slate-600">
+                                    <Github className="w-5 h-5" />
+                                    View Source
+                                </button>
+                            </div>
+
+                            <div className="relative mx-auto w-full max-w-5xl aspect-[16/9] md:aspect-[21/9] lg:h-[500px] bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl group transition-all hover:border-indigo-500/30">
+                                <div className="absolute top-4 left-4 z-10 flex gap-2">
+                                    <div className="px-3 py-1 bg-slate-950/80 backdrop-blur rounded-lg border border-slate-800 text-xs font-mono text-indigo-400 flex items-center gap-2">
+                                        <Box className="w-3 h-3" /> Digital Twin: NIPE Campus
+                                    </div>
+                                </div>
+                                <div className="absolute bottom-4 right-4 z-10 hidden md:block text-xs text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded">
+                                    LMB: Rotate • Scroll: Zoom • RMB: Pan
+                                </div>
+                                <College3D />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Problem Section */}
+                    <section id="problem" className="py-24 bg-slate-950 relative overflow-hidden">
+                        <div className="container mx-auto px-6">
+                            <div className="flex flex-col md:flex-row gap-16">
+                                <div className="md:w-1/2">
+                                    <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">The Deprecated Way</h2>
+                                    <p className="text-slate-400 text-lg mb-8 leading-relaxed">
+                                        Manual roll calls are a <span className="text-red-400 font-semibold">O(n)</span> time complexity operation that blocks the main thread of education. We refactored the entire process.
+                                    </p>
+                                    <div className="space-y-6">
+                                        <ProblemCard icon={<XCircle className="text-red-500" />} title="Time Inefficient" desc="Manual calls consume 10-15 minutes of valuable lecture time." />
+                                        <ProblemCard icon={<AlertTriangle className="text-orange-500" />} title="Data Vulnerability" desc="Paper sheets are easily lost, damaged, or manipulated." />
+                                        <ProblemCard icon={<Users className="text-yellow-500" />} title="Proxy Attendance" desc="High risk of students signing in for absent friends." />
+                                    </div>
+                                </div>
+                                <div className="md:w-1/2">
+                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 sticky top-32">
+                                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><CheckCircle2 className="text-emerald-500" /> System Objectives</h3>
+                                        <ul className="space-y-4">
+                                            <ObjectiveItem text="Fast & Secure Dual-Verification" />
+                                            <ObjectiveItem text="Zero Proxy Tolerance" />
+                                            <ObjectiveItem text="O(1) Access to Records" />
+                                            <ObjectiveItem text="Automated Reporting Pipelines" />
+                                            <ObjectiveItem text="Filterable Data (Date, Course, Student)" />
+                                        </ul>
+                                        <div className="mt-8 pt-8 border-t border-slate-800">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="text-center">
+                                                    <div className="text-3xl font-bold text-white">99.9%</div>
+                                                    <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Uptime</div>
+                                                </div>
+                                                <div className="text-center border-l border-slate-800">
+                                                    <div className="text-3xl font-bold text-white">&lt;2s</div>
+                                                    <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">Latency</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Solution Section */}
+                    <section id="solution" className="py-24 bg-slate-900/30 border-y border-slate-900">
+                        <div className="container mx-auto px-6">
+                            <div className="text-center mb-16">
+                                <h2 className="text-3xl md:text-4xl font-bold mb-4">Architecture & Workflow</h2>
+                                <p className="text-slate-400">A seamless data flow from lecture start to SQL commit.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(200px,auto)]">
+                                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 hover:border-indigo-500/50 transition-all hover:-translate-y-1 group relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 font-bold text-6xl text-slate-600">01</div>
+                                    <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-6 group-hover:bg-blue-500/20 transition-colors"><Users className="text-blue-400 w-6 h-6" /></div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Teacher Initiates</h3>
+                                    <p className="text-slate-400 text-sm">Faculty logs into the dashboard and generates a secure, time-bound dynamic QR code for the specific session.</p>
+                                </div>
+                                <div className="md:col-span-2 bg-gradient-to-br from-indigo-950/40 to-slate-950 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                                    <div className="flex-1 z-10">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center"><Scan className="text-indigo-400 w-6 h-6" /></div>
+                                            <div className="px-3 py-1 bg-indigo-500/20 rounded-full text-indigo-300 text-xs font-mono">Core Feature</div>
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-white mb-3">Dual Verification Engine</h3>
+                                        <p className="text-slate-400 text-sm leading-relaxed mb-4">The student scans the QR code via the web app. Simultaneously, the webcam captures a live feed. The backend validates the <span className="text-indigo-400 font-mono">QR Token Validity</span> AND matches the face embedding using <span className="text-white font-mono">InsightFace</span> algorithms against the enrolled database.</p>
+                                    </div>
+                                    <div className="w-full md:w-2/5 aspect-square md:aspect-video bg-slate-900 rounded-lg border border-slate-700 flex flex-col relative z-10 shadow-2xl overflow-hidden">
+                                        <div className="h-full w-full relative">
+                                            <div className="absolute top-0 w-full h-1 bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,1)] animate-scan z-20"></div>
+                                            <div className="absolute inset-0 flex items-center justify-center z-10"><UserCheck className="w-16 h-16 text-slate-700" /></div>
+                                            <div className="absolute bottom-4 left-4 right-4 bg-slate-800/90 backdrop-blur p-2 rounded border border-slate-700">
+                                                <div className="flex justify-between text-xs font-mono mb-1"><span className="text-slate-400">Match Score:</span><span className="text-emerald-400">0.9842</span></div>
+                                                <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden"><div className="w-[98%] h-full bg-emerald-500"></div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2 bg-slate-950 border border-slate-800 rounded-2xl p-6 hover:border-emerald-500/50 transition-all hover:-translate-y-1 group relative">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 font-bold text-6xl text-slate-600">03</div>
+                                    <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:bg-emerald-500/20 transition-colors"><Database className="text-emerald-400 w-6 h-6" /></div>
+                                    <div className="flex flex-col md:flex-row gap-6">
+                                        <div className="flex-1">
+                                            <h3 className="text-xl font-bold text-white mb-2">Real-time Commit</h3>
+                                            <p className="text-slate-400 text-sm">On successful verification, attendance is committed to the MySQL database with a precise timestamp. The teacher's dashboard updates instantly via WebSocket polling or refresh.</p>
+                                        </div>
+                                        <div className="flex-1 bg-slate-900 rounded border border-slate-800 p-3 font-mono text-xs text-slate-400">
+                                            <div className="text-emerald-400 mb-1">UPDATE attendance_log</div>
+                                            <div className="pl-4">SET status = 'PRESENT',</div>
+                                            <div className="pl-4">verify_method = 'DUAL_AUTH',</div>
+                                            <div className="pl-4">timestamp = NOW()</div>
+                                            <div className="text-yellow-400 mt-1">WHERE student_id = 'NU24UCA006';</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all hover:-translate-y-1 group relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 font-bold text-6xl text-slate-600">04</div>
+                                    <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:bg-purple-500/20 transition-colors"><LayoutDashboard className="text-purple-400 w-6 h-6" /></div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Auto Reports</h3>
+                                    <p className="text-slate-400 text-sm">Generate daily, weekly, or monthly reports in CSV/PDF formats. Filter complex datasets instantly.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Tech Stack */}
+                    <section id="tech" className="py-24 bg-slate-950">
+                        <div className="container mx-auto px-6">
+                            <div className="mb-12 flex items-end justify-between">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-2">The Stack</h2>
+                                    <p className="text-slate-400">Selected for performance, scalability, and ease of deployment.</p>
+                                </div>
+                                <div className="hidden md:block h-px flex-1 bg-slate-800 ml-8 mb-4"></div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <TechCard icon={<Code />} name="Python" desc="Backend Logic" color="text-yellow-400" borderColor="hover:border-yellow-400/50" />
+                                <TechCard icon={<Server />} name="Flask" desc="Micro-framework" color="text-white" borderColor="hover:border-white/50" />
+                                <TechCard icon={<UserCheck />} name="OpenCV" desc="Image Processing" color="text-green-400" borderColor="hover:border-green-400/50" />
+                                <TechCard icon={<Cpu />} name="InsightFace" desc="Biometric Algo" color="text-indigo-400" borderColor="hover:border-indigo-400/50" />
+                                <TechCard icon={<Database />} name="MySQL" desc="Relational DB" color="text-blue-400" borderColor="hover:border-blue-400/50" />
+                                <TechCard icon={<Zap />} name="Tailwind" desc="Responsive UI" color="text-cyan-400" borderColor="hover:border-cyan-400/50" />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Challenges Section */}
+                    <section id="challenges" className="py-24 bg-slate-900 border-y border-slate-800">
+                        <div className="container mx-auto px-6">
+                            <div className="grid md:grid-cols-2 gap-12 items-center">
+                                <div>
+                                    <h2 className="text-3xl font-bold text-white mb-6">Engineering Challenges</h2>
+                                    <p className="text-slate-400 mb-8">Building a computer vision system in the browser isn't straightforward. Here are the hurdles we cleared and what we learned.</p>
+                                    <div className="space-y-6">
+                                        <div className="flex gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0"><Lightbulb className="w-5 h-5 text-yellow-400" /></div>
+                                            <div><h4 className="text-white font-bold mb-1">Adaptive Lighting</h4><p className="text-sm text-slate-400">Poor lighting and masks affected recognition. We implemented adaptive thresholds and image preprocessing to normalize input feeds.</p></div>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0"><Database className="w-5 h-5 text-blue-400" /></div>
+                                            <div><h4 className="text-white font-bold mb-1">Query Optimization</h4><p className="text-sm text-slate-400">Initial fetch times were slow. We optimized SQL queries and added indexing to crucial columns to reduce latency.</p></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-[#0f172a] rounded-xl overflow-hidden shadow-2xl border border-slate-800 font-mono text-sm">
+                                    <div className="bg-slate-800/50 px-4 py-2 flex items-center gap-2 border-b border-slate-700">
+                                        <div className="w-3 h-3 rounded-full bg-red-500" /><div className="w-3 h-3 rounded-full bg-yellow-500" /><div className="w-3 h-3 rounded-full bg-green-500" /><div className="ml-2 text-slate-500 text-xs">server_logs.txt</div>
+                                    </div>
+                                    <div className="p-6 text-slate-300 space-y-2">
+                                        <div className="flex gap-2"><span className="text-indigo-400">➜</span><span className="text-yellow-300">WARNING:</span> Low light detected in webcam feed.</div>
+                                        <div className="flex gap-2"><span className="text-indigo-400">➜</span><span className="text-blue-300">INFO:</span> Activating CLAHE (Contrast Limited Adaptive Histogram Equalization)...</div>
+                                        <div className="flex gap-2"><span className="text-indigo-400">➜</span><span className="text-green-400">SUCCESS:</span> Lighting normalized. Face detected.</div>
+                                        <div className="flex gap-2"><span className="text-indigo-400">➜</span><span className="text-blue-300">INFO:</span> Migrating legacy framework to Flask...</div>
+                                        <div className="flex gap-2"><span className="text-indigo-400">➜</span><span className="text-green-400">DONE:</span> Performance improved by 40%.</div>
+                                        <div className="flex gap-2 mt-4 animate-pulse"><span className="text-indigo-400">➜</span><span className="text-slate-500">_</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Roadmap Section */}
+                    <section id="roadmap" className="py-24 bg-slate-950">
+                        <div className="container mx-auto px-6">
+                            <div className="text-center mb-16">
+                                <h2 className="text-3xl font-bold text-white">Future Roadmap</h2>
+                                <p className="text-slate-400 mt-2">Where we are taking the project next.</p>
+                            </div>
+                            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <RoadmapCard icon={<Smartphone />} title="Native Mobile Apps" desc="Dedicated iOS and Android applications for better hardware access." status="Planned" />
+                                <RoadmapCard icon={<MapPin />} title="GPS Geofencing" desc="Ensure students are physically within the classroom coordinates." status="Research" />
+                                <RoadmapCard icon={<Share2 />} title="LMS Integration" desc="API connections to existing College Management Systems." status="In Progress" />
+                                <RoadmapCard icon={<Lock />} title="Advanced Biometrics" desc="Enhanced recognition for partial face visibility (heavy masks)." status="Planned" />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Team Section */}
+                    <section id="team" className="py-24 bg-slate-900 border-t border-slate-800 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                            <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl"></div>
+                            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+                        </div>
+                        <div className="container mx-auto px-6 text-center relative z-10">
+                            <h2 className="text-3xl font-bold mb-4 text-white">The Team</h2>
+                            <p className="text-slate-400 mb-16 max-w-2xl mx-auto">Developed by students of the Department of Computer Applications, Nitte Institute of Professional Education.</p>
+
+                            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                                <TeamMember
+                                    name="Alan Benny" role="Lead Developer"
+                                    linkedinUrl="https://www.linkedin.com/in/alanbennyofficial" linkedinHandle="in/alanbennyofficial"
+                                    githubUrl="https://github.com/alanbennyofficial" githubHandle="@alanbennyofficial"
+                                />
+                                <TeamMember
+                                    name="Aryan Sandeep Dhuri" role="Backend Engineer"
+                                    linkedinUrl="https://www.linkedin.com/in/aryan-dhuri-947363229/" linkedinHandle="in/aryan-dhuri"
+                                    githubUrl="https://github.com/AryanDhuri" githubHandle="@AryanDhuri"
+                                />
+                                <TeamMember
+                                    name="Edwin Lear D'Souza" role="Frontend Architect"
+                                    linkedinUrl="https://www.linkedin.com/in/edwin-lear-dsouza-297442269/" linkedinHandle="in/edwin-lear-dsouza"
+                                    githubUrl="https://github.com/edwinlear" githubHandle="@edwinlear"
+                                />
+                            </div>
+
+                            <div className="mt-20 flex flex-col items-center">
+                                <div className="px-8 py-6 bg-slate-800/50 rounded-2xl border border-slate-700 backdrop-blur-sm">
+                                    <p className="text-slate-300 text-sm font-medium mb-2">Project Guide</p>
+                                    <p className="text-xl font-bold text-white">Mr. Praveen N</p>
+                                    <p className="text-indigo-400 text-sm mt-1">Python Backend Course (24PCA305)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-900 py-12 bg-slate-950 text-center md:text-left">
+                        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2 font-bold text-lg text-white">
+                                    <Scan className="w-5 h-5 text-indigo-500" />
+                                    NIPE Attendance
+                                </div>
+                                <p className="text-slate-500 text-sm">© 2025 Alan Benny, Aryan Sandeep Dhuri, Edwin Lear D'Souza</p>
+                            </div>
+                            <div className="flex gap-6">
+                                {/* Links removed as requested */}
+                            </div>
+                        </div>
+                    </footer>
+
+                    {/* Demo Modal */}
+                    {demoModalOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-md w-full relative shadow-2xl">
+                                <button onClick={() => setDemoModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4"><Terminal className="w-8 h-8" /></div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">Demo Request</h3>
+                                    <p className="text-slate-400 mb-6">The live instance is currently restricted to campus IP addresses. Please view the source code or request access from the admin.</p>
+                                    <button onClick={() => setDemoModalOpen(false)} className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors">Got it</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const College3D = () => {
+            const mountRef = useRef(null);
+
+            useEffect(() => {
+                if (!mountRef.current) return;
+
+                const PALETTE = { background: 0x020617, ground: 0x1e293b, grass: 0x0f172a, walls: 0xe2e8f0, roof: 0x9f1239, windows: 0x38bdf8, trees: 0x047857, steps: 0x475569, road: 0x334155 };
+                let scene, camera, renderer, controls, animationId;
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(PALETTE.background);
+                scene.fog = new THREE.Fog(PALETTE.background, 50, 200);
+
+                const width = mountRef.current.clientWidth;
+                const height = mountRef.current.clientHeight;
+                const aspect = width / height;
+                const d = 60;
+                camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+                camera.position.set(50, 50, 50);
+                camera.lookAt(scene.position);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(width, height);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                mountRef.current.appendChild(renderer.domElement);
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                dirLight.position.set(20, 40, 20);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                scene.add(dirLight);
+                const backLight = new THREE.DirectionalLight(0x7efff5, 0.3);
+                backLight.position.set(-20, 10, -20);
+                scene.add(backLight);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.minZoom = 0.5;
+                controls.maxZoom = 2;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.5;
+
+                const createBox = (w, h, d, color, x, y, z, rotY = 0) => {
+                    const geometry = new THREE.BoxGeometry(w, h, d);
+                    const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.1, flatShading: true });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(x, y + h / 2, z);
+                    mesh.rotation.y = rotY;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    return mesh;
+                };
+                const createCylinder = (radiusTop, radiusBottom, height, color, x, y, z, segments = 32) => {
+                    const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments);
+                    const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.1, flatShading: true });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(x, y + height / 2, z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    return mesh;
+                };
+                const createPrism = (width, length, height, color, x, y, z, rotY = 0) => {
+                    const shape = new THREE.Shape();
+                    shape.moveTo(0, 0);
+                    shape.lineTo(width / 2, height);
+                    shape.lineTo(width, 0);
+                    shape.lineTo(0, 0);
+                    const extrudeSettings = { steps: 1, depth: length, bevelEnabled: false };
+                    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                    geometry.translate(-width / 2, 0, -length / 2);
+                    const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.1, flatShading: true });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(x, y, z);
+                    mesh.rotation.y = rotY;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    return mesh;
+                };
+
+                // Create Ground (Road removed as requested)
+                const geometry = new THREE.BoxGeometry(100, 2, 100);
+                const material = new THREE.MeshStandardMaterial({ color: PALETTE.ground, flatShading: true });
+                const ground = new THREE.Mesh(geometry, material);
+                ground.position.y = -1;
+                ground.receiveShadow = true;
+                scene.add(ground);
+                const grassGeo = new THREE.BoxGeometry(90, 0.5, 90);
+                const grassMat = new THREE.MeshStandardMaterial({ color: PALETTE.grass, flatShading: true });
+                const grass = new THREE.Mesh(grassGeo, grassMat);
+                grass.position.y = 0.25;
+                grass.receiveShadow = true;
+                scene.add(grass);
+
+                // Create Building
+                const buildingGroup = new THREE.Group();
+                const floorHeight = 2.5;
+                const totalHeight = floorHeight * 4;
+                const rotundaRadius = 8;
+                buildingGroup.add(createCylinder(rotundaRadius, rotundaRadius, totalHeight, PALETTE.walls, 0, 0, 0, 32));
+                buildingGroup.add(createCylinder(rotundaRadius + 2, rotundaRadius + 2, 0.8, PALETTE.roof, 0, totalHeight, 0, 32));
+                buildingGroup.add(createBox(6, 2, 6, PALETTE.walls, 0, totalHeight + 0.8, 0));
+                const upperRoofGeo = new THREE.ConeGeometry(5, 3, 4);
+                const upperRoofMat = new THREE.MeshStandardMaterial({ color: PALETTE.roof, flatShading: true });
+                const upperRoof = new THREE.Mesh(upperRoofGeo, upperRoofMat);
+                upperRoof.position.set(0, totalHeight + 0.8 + 2 + 1.5, 0);
+                upperRoof.rotation.y = Math.PI / 4;
+                upperRoof.castShadow = true;
+                buildingGroup.add(upperRoof);
+                const wingLength = 25; const wingWidth = 10; const wingHeight = totalHeight; const roofHeight = 5;
+                const leftWing = createBox(wingLength, wingHeight, wingWidth, PALETTE.walls, -15, 0, -5);
+                leftWing.rotation.y = Math.PI / 6;
+                buildingGroup.add(leftWing);
+                const leftRoof = createPrism(wingWidth + 2, wingLength + 2, roofHeight, PALETTE.roof, -15, wingHeight, -5);
+                leftRoof.geometry.rotateY(Math.PI / 2); leftRoof.rotation.y = Math.PI / 6;
+                buildingGroup.add(leftRoof);
+                const rightWing = createBox(wingLength, wingHeight, wingWidth, PALETTE.walls, 15, 0, -5);
+                rightWing.rotation.y = -Math.PI / 6;
+                buildingGroup.add(rightWing);
+                const rightRoof = createPrism(wingWidth + 2, wingLength + 2, roofHeight, PALETTE.roof, 15, wingHeight, -5);
+                rightRoof.geometry.rotateY(Math.PI / 2); rightRoof.rotation.y = -Math.PI / 6;
+                buildingGroup.add(rightRoof);
+                const addWindowsToWing = (x, z, rotY) => {
+                    for (let f = 1; f < 4; f++) {
+                        for (let w = -2; w <= 2; w++) {
+                            const win = createBox(1.5, 1.2, 0.2, PALETTE.windows, 0, 0, 0);
+                            const localY = f * 2.5;
+                            win.rotation.y = rotY;
+                            win.position.set(x + (w * 3.5 * Math.cos(rotY)) + (Math.sin(rotY) * 5.1), localY, z + (-w * 3.5 * Math.sin(rotY)) + (Math.cos(rotY) * 5.1));
+                            buildingGroup.add(win);
+                        }
+                    }
+                };
+                addWindowsToWing(15, -5, -Math.PI / 6); addWindowsToWing(-15, -5, Math.PI / 6);
+                for (let f = 1; f < 4; f++) {
+                    for (let a = 0; a <= Math.PI; a += Math.PI / 6) {
+                        if (a > 0.2 && a < 2.9) {
+                            const win = createBox(1.5, 1.2, 0.5, PALETTE.windows, 0, 0, 0);
+                            const r = rotundaRadius;
+                            win.position.set(Math.cos(a) * r, f * 2.5, Math.sin(a) * r);
+                            win.lookAt(0, f * 2.5, 0);
+                            buildingGroup.add(win);
+                        }
+                    }
+                }
+                buildingGroup.add(createBox(6, 4, 6, PALETTE.walls, 0, 0, 8));
+                buildingGroup.add(createBox(7, 0.5, 7, PALETTE.roof, 0, 4, 8));
+                scene.add(buildingGroup);
+
+                // Create Forest (retained)
+                const createTree = (x, z, scale = 1) => {
+                    const treeGroup = new THREE.Group();
+                    const trunkColor = 0x8d6e63;
+                    treeGroup.add(createCylinder(0.5 * scale, 0.7 * scale, 3 * scale, trunkColor, 0, 0, 0, 6));
+                    const leavesGeo = new THREE.IcosahedronGeometry(2.5 * scale, 0);
+                    const leavesMat = new THREE.MeshStandardMaterial({ color: PALETTE.trees, flatShading: true });
+                    const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                    leaves.position.y = 3 * scale;
+                    treeGroup.add(leaves);
+                    if (Math.random() > 0.5) {
+                        const topLeaves = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * scale, 0), leavesMat);
+                        topLeaves.position.y = 4.5 * scale;
+                        treeGroup.add(topLeaves);
+                    }
+                    treeGroup.position.set(x, 0.5, z);
+                    scene.add(treeGroup);
+                };
+                for (let i = 0; i < 60; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 25 + Math.random() * 25;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    if (z > 0 && z < 40 && Math.abs(x) < 15) continue;
+                    if (z > 20 && z < 40 && Math.abs(x) < 25) continue;
+                    createTree(x, z, 0.8 + Math.random() * 0.5);
+                }
+                for (let i = 0; i < 30; i++) {
+                    const x = (Math.random() - 0.5) * 100;
+                    const z = -20 - (Math.random() * 30);
+                    createTree(x, z, 1.2);
+                }
+
+                const animate = () => {
+                    animationId = requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                };
+                animate();
+
+                const handleResize = () => {
+                    if (!mountRef.current) return;
+                    const width = mountRef.current.clientWidth;
+                    const height = mountRef.current.clientHeight;
+                    const aspect = width / height;
+                    const d = 60;
+                    camera.left = -d * aspect;
+                    camera.right = d * aspect;
+                    camera.top = d;
+                    camera.bottom = -d;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(width, height);
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                    cancelAnimationFrame(animationId);
+                    if (mountRef.current && renderer.domElement) {
+                        mountRef.current.removeChild(renderer.domElement);
+                    }
+                };
+            }, []);
+
+            return <div ref={mountRef} className="w-full h-full cursor-move" />;
+        };
+
+        const ProblemCard = ({ icon, title, desc }) => (
+            <div className="flex gap-4 p-4 rounded-xl hover:bg-slate-900/50 transition-colors border border-transparent hover:border-slate-800">
+                <div className="mt-1">{icon}</div>
+                <div>
+                    <h4 className="text-white font-bold mb-1">{title}</h4>
+                    <p className="text-slate-400 text-sm">{desc}</p>
+                </div>
+            </div>
+        );
+
+        const ObjectiveItem = ({ text }) => (
+            <li className="flex items-start gap-3 text-slate-300">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2.5 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                {text}
+            </li>
+        );
+
+        const TechCard = ({ icon, name, desc, color, borderColor }) => (
+            <div className={`bg-slate-900/50 border border-slate-800 p-4 rounded-xl flex flex-col items-center justify-center text-center transition-all duration-300 cursor-default group ${borderColor}`}>
+                <div className={`mb-3 transform group-hover:scale-110 transition-transform duration-300 ${color}`}>
+                    {React.cloneElement(icon, { size: 32 })}
+                </div>
+                <div className="font-bold text-slate-200">{name}</div>
+                <div className="text-xs text-slate-500">{desc}</div>
+            </div>
+        );
+
+        const RoadmapCard = ({ icon, title, desc, status }) => (
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:bg-slate-800/50 transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-slate-950 rounded-lg text-indigo-400 group-hover:text-white group-hover:bg-indigo-600 transition-colors">
+                        {icon}
+                    </div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider bg-slate-950 px-2 py-1 rounded text-slate-500 border border-slate-800">
+                        {status}
+                    </span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+                <p className="text-sm text-slate-400">{desc}</p>
+            </div>
+        );
+
+        const TeamMember = ({ name, role, linkedinUrl, linkedinHandle, githubUrl, githubHandle }) => (
+            <div className="group relative">
+                <div className="absolute inset-0 bg-indigo-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative bg-slate-950 border border-slate-800 p-8 rounded-2xl hover:-translate-y-2 transition-transform duration-300 flex flex-col items-center">
+                    <img src={`https://github.com/${githubHandle.replace('@', '')}.png`} alt={name} className="w-24 h-24 rounded-full mb-4 object-cover border-2 border-slate-700 shadow-xl" />
+                    <h3 className="text-lg font-bold text-white mb-1">{name}</h3>
+                    <p className="text-indigo-400 text-sm font-medium mb-6">{role}</p>
+                    <div className="flex justify-center items-center gap-2">
+                        <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="no-underline">
+                            <div className="flex justify-center items-center cursor-pointer h-[50px] w-[50px] text-white rounded-[10px] shadow-[0px_10px_10px_rgba(0,0,0,0.1)] bg-[#444] transition-all duration-300 hover:w-[200px] hover:rounded-[5px] group/btn overflow-hidden">
+                                <svg viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg" className="fill-[#0babf5] shrink-0">
+                                    <path d="M4.98 3.5c0 1.381-1.11 2.5-2.48 2.5s-2.48-1.119-2.48-2.5c0-1.38 1.11-2.5 2.48-2.5s2.48 1.12 2.48 2.5zm.02 4.5h-5v16h5v-16zm7.982 0h-4.968v16h4.969v-8.399c0-4.67 6.029-5.052 6.029 0v8.399h4.988v-10.131c0-7.88-8.922-7.593-11.018-3.714v-2.155z"></path>
+                                </svg>
+                                <span className="w-0 overflow-hidden transition-all duration-300 text-center ml-0 group-hover/btn:ml-[5px] group-hover/btn:w-[150px] whitespace-nowrap font-sans text-sm">
+                                    {linkedinHandle}
+                                </span>
+                            </div>
+                        </a>
+                        <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="no-underline">
+                            <div className="flex justify-center items-center cursor-pointer h-[50px] w-[50px] text-white rounded-[10px] shadow-[0px_10px_10px_rgba(0,0,0,0.1)] bg-[#444] transition-all duration-300 hover:w-[200px] hover:rounded-[5px] group/btn overflow-hidden">
+                                <svg viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg" className="fill-white shrink-0">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path>
+                                </svg>
+                                <span className="w-0 overflow-hidden transition-all duration-300 text-center ml-0 group-hover/btn:ml-[5px] group-hover/btn:w-[150px] whitespace-nowrap font-sans text-sm">
+                                    {githubHandle}
+                                </span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Mount the app
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
+
 </html>
